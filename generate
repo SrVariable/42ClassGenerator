@@ -1,0 +1,206 @@
+#!/usr/bin/python3
+
+import sys
+
+IS_SET_OCF_MESSAGE = False
+def ocf_message_template():
+    return """// Helper macro to turn off OCF messages
+#ifdef QUIET
+# define OCF_MESSAGE(X)
+#else
+# define OCF_MESSAGE(X) std::cout << (X) << std::endl
+#endif"""
+
+def constructor_template(classname, attributes):
+    s = f"{classname}::{classname}()\n"
+
+    if len(attributes) > 0:
+        s = f"{classname}::{classname}() :\n"
+        for i in range(0, len(attributes)):
+            attribute = attributes[i]
+            if i == len(attributes) - 1:
+                s += f"\t{attribute}(0)\n"
+            else:
+                s += f"\t{attribute}(0),\n"
+
+    s += "{\n"
+
+    if IS_SET_OCF_MESSAGE:
+        s += f'\tOCF_MESSAGE("{classname} Default constructor called");\n'
+    else:
+        s += f'\tstd::cout << "{classname} Default constructor called" << std::endl;\n'
+
+    s += "}"
+    return s
+
+
+def destructor_template(classname, attribute):
+    s = f"{classname}::~{classname}()\n"
+    s += "{\n"
+
+    if IS_SET_OCF_MESSAGE:
+        s += f'\tOCF_MESSAGE("{classname} Destructor called");\n'
+    else:
+        s += f'\tstd::cout << "{classname} Destructor called" << std::endl;\n'
+
+    s += "}"
+    return s
+
+
+def copy_constructor_template(classname, attributes):
+    s = f"{classname}::{classname}(const {classname}&)\n"
+    if len(attributes) > 0:
+        s = f"{classname}::{classname}(const {classname}& that)\n"
+    s += "{\n"
+
+    if IS_SET_OCF_MESSAGE:
+        s += f'\tOCF_MESSAGE("{classname} Copy constructor called");\n'
+    else:
+        s += f'\tstd::cout << "{classname} Copy constructor called" << std::endl;\n'
+
+    if len(attributes) > 0:
+        s += "\t// WARNING: Take in mind deep copies\n"
+        s += "\tif (this == &that)\n"
+        s += "\t{\n"
+
+        for attribute in attributes:
+            s += f"\t\t{attribute} = that.{attribute};\n"
+
+        s += "\t}\n"
+
+    s += "}\n"
+    return s
+
+
+def assignment_operator_template(classname, attributes):
+    s = f"{classname}&\t{classname}::operator=(const {classname}&)\n"
+    if len(attributes) > 0:
+        s = f"{classname}&\t{classname}::operator=(const {classname}& that)\n"
+    s += "{\n"
+
+    if IS_SET_OCF_MESSAGE:
+        s += f'\tOCF_MESSAGE("{classname} Assignment operator called");\n'
+    else:
+        s += f'\tstd::cout << "{classname} Assignment operator called" << std::endl;\n'
+
+    if len(attributes) > 0:
+        s += "\t// WARNING: Take in mind deep copies\n"
+        s += "\tif (this == &that)\n"
+        s += "\t{\n"
+
+        for attribute in attributes:
+            s += f"\t\t{attribute} = that.{attribute};\n"
+
+        s += "\t}\n"
+
+    s += "\treturn (*this);\n"
+    s += "}\n"
+
+    return s
+
+
+def src_getters_template(classname, attributes):
+    s = ""
+
+    for i in range(0, len(attributes)):
+        attribute = attributes[i]
+        capitalized_attribute = attribute[0].upper() + attribute[1:]
+        s += f"int\t{classname}::get{capitalized_attribute}()\n"
+        s += "{\n"
+        s += f"\t return ({attribute});\n"
+        s += "}\n"
+
+        if i < len(attributes) - 1:
+            s += "\n"
+
+    return s
+
+
+def header_getters_template(attributes):
+    s = ""
+
+    for attribute in attributes:
+        capitalized_attribute = attribute[0].upper() + attribute[1:]
+        s += f"\t\tint\tget{capitalized_attribute}();\n"
+
+    if len(attributes) > 0:
+        s += "\n"
+
+    return s
+
+
+def header_attributes_template(attributes):
+    s = ""
+
+    for attribute in attributes:
+        s += f"\t\tint\t{attribute};\n"
+
+    return s
+
+
+def header_template(classname, attributes):
+    header = classname.upper()
+    s = f"""#ifndef {header}_H
+# define {header}_H
+
+class {classname}
+{{
+\tpublic:
+\t\t{classname}();
+\t\t~{classname}();
+\t\t{classname}(const {classname}& that);
+\t\t{classname}& operator=(const {classname}& that);
+"""
+
+    if len(attributes) > 0:
+        s += "\n"
+        s += header_getters_template(attributes)
+        s += "\tprivate:\n"
+        s += header_attributes_template(attributes)
+
+
+    s += "};\n\n"
+    s += "#endif\n"
+
+    return s
+
+
+def src_template(classname, attributes):
+    header = classname
+    s = f"""#include "{header}.hpp"
+#include <iostream>
+
+{ocf_message_template()}
+
+{constructor_template(classname, attributes)}
+
+{destructor_template(classname, attributes)}
+
+{copy_constructor_template(classname, attributes)}
+
+{assignment_operator_template(classname, attributes)}
+"""
+    if len(attributes) > 0:
+        s += "\n"
+        s += src_getters_template(classname, attributes)
+    return s
+
+if len(sys.argv) < 2:
+    print(f"Usage: {sys.argv[0]} <classname> [attributes]")
+    sys.exit(1)
+
+classname = sys.argv[1]
+
+attributes = []
+if len(sys.argv) > 2:
+    attributes = sys.argv[2:]
+
+kv = {
+    "hpp": header_template,
+    "cpp": src_template,
+}
+
+for extension in kv.keys():
+    #print(kv[extension](classname, attributes))
+    with open(f"{classname}.{extension}", 'w') as f:
+        f.write(kv[extension](classname, attributes))

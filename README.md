@@ -7,4 +7,6 @@ one class with or without attributes.
 
 ## Usage
 
+```
 ./generate <classname> [attributes]
+```

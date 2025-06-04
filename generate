@@ -68,7 +68,7 @@ def copy_constructor_template(classname, attributes):
 
         s += "\t}\n"
 
-    s += "}\n"
+    s += "}"
     return s
 
 
@@ -94,7 +94,7 @@ def assignment_operator_template(classname, attributes):
         s += "\t}\n"
 
     s += "\treturn (*this);\n"
-    s += "}\n"
+    s += "}"
 
     return s
 
